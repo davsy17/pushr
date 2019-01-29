@@ -29,7 +29,7 @@ type DateKVParser struct {
 	LogLineFormat string
 }
 
-func NewDateKVParser(app, appVer, filename, hostname string, fieldMappings map[string]string, defaultTable []Attribute, options []string) *DateKVParser {
+func NewDateKVParser(app, appVer, filename, hostname string, fieldMappings map[string]string, re *regexp.Regexp, defaultTable []Attribute, options []string) *DateKVParser {
 
 	logLineFmt := "kv"
 	parsedOptions := ParseOptions(options)
@@ -39,6 +39,10 @@ func NewDateKVParser(app, appVer, filename, hostname string, fieldMappings map[s
 				logLineFmt = v
 			}
 		}
+	}
+
+	if re != nil {
+		keyValueRegex = re
 	}
 
 	return &DateKVParser{
@@ -83,8 +87,14 @@ func (p *DateKVParser) Parse(line string) (map[string]string, error) {
 	}
 
 	vals := keyValueRegex.FindAllStringSubmatch(line[24:], -1)
+
 	for _, item := range vals {
-		matches[item[1]] = item[2]
+		// loop through values for a non-null value bucket
+		for i := 2; i < len(item); i++ {
+			if !isNull(item[i]) {
+				matches[item[1]] = item[i]
+			}
+		}
 	}
 
 	for k, v := range p.FieldMappings {
@@ -110,6 +120,5 @@ func (p *DateKVParser) Parse(line string) (map[string]string, error) {
 		}
 	}
 	result["log_line"] = strings.TrimSpace(cleanLogLine)
-
 	return result, nil
 }
